@@ -39,6 +39,10 @@ public class YearSummary {
         this.months = months;
     }
 
+    public List<MonthSummary> getMonthSummaries() {
+        return getMonths();
+    }
+
     public MonthSummary getOrCreateMonth(Integer month) {
         Optional<MonthSummary> existingMonth = months.stream()
                 .filter(m -> m.getMonth().equals(month))

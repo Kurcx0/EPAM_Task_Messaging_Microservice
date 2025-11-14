@@ -63,6 +63,25 @@ public class TrainerWorkload {
         this.years = years;
     }
 
+    public Long getId() {
+        if (trainerUsername != null && trainerUsername.startsWith("trainer")) {
+            try {
+                return Long.parseLong(trainerUsername.substring(7));
+            } catch (NumberFormatException e) {
+                return null;
+            }
+        }
+        return null;
+    }
+
+    public String getUsername() {
+        return getTrainerUsername();
+    }
+
+    public List<YearSummary> getYearSummaries() {
+        return getYears();
+    }
+
     public YearSummary getOrCreateYear(Integer year) {
         Optional<YearSummary> existingYear = years.stream()
                 .filter(y -> y.getYear().equals(year))

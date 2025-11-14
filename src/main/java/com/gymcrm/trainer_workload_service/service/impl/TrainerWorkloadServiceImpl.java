@@ -2,6 +2,8 @@ package com.gymcrm.trainer_workload_service.service.impl;
 
 import com.gymcrm.trainer_workload_service.dto.MonthlyWorkloadResponse;
 import com.gymcrm.trainer_workload_service.dto.WorkloadRequest;
+import com.gymcrm.trainer_workload_service.dto.messaging.TrainerWorkloadRequest;
+import com.gymcrm.trainer_workload_service.dto.messaging.TrainerWorkloadResponse;
 import com.gymcrm.trainer_workload_service.model.MonthSummary;
 import com.gymcrm.trainer_workload_service.model.TrainerWorkload;
 import com.gymcrm.trainer_workload_service.model.YearSummary;
@@ -13,6 +15,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
 import java.time.LocalDate;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 
@@ -96,6 +99,85 @@ public class TrainerWorkloadServiceImpl implements TrainerWorkloadService {
 
         Integer hours = trainerWorkload.get().getMonthlyWorkload(year, month);
         return new MonthlyWorkloadResponse(year, month, hours);
+    }
+
+    @Override
+    public TrainerWorkloadResponse calculateWorkload(TrainerWorkloadRequest request) {
+        logger.info("Calculating workload from message for trainer: {}", request.getTrainerId());
+
+        if (request.getTrainerId() == null) {
+            logger.error("Invalid workload calculation request: trainerId is required");
+            throw new IllegalArgumentException("Trainer ID is required");
+        }
+
+        Optional<TrainerWorkload> trainerOpt;
+
+        trainerOpt = repository.findById(request.getTrainerId());
+
+        if (trainerOpt.isEmpty() && request.getUsername() != null) {
+            trainerOpt = repository.findByUsername(request.getUsername());
+        }
+
+        if (trainerOpt.isEmpty() && request.getUsername() == null) {
+            String usernamePattern = "trainer" + request.getTrainerId();
+            trainerOpt = repository.findByUsername(usernamePattern);
+        }
+
+        if (trainerOpt.isEmpty()) {
+            logger.warn("Trainer with ID {} not found", request.getTrainerId());
+            throw new IllegalArgumentException("Trainer with ID " + request.getTrainerId() + " not found");
+        }
+
+        TrainerWorkload trainer = trainerOpt.get();
+
+        TrainerWorkloadResponse response = new TrainerWorkloadResponse();
+        response.setTrainerId(request.getTrainerId());
+        response.setUsername(trainer.getUsername());
+
+        int totalHours = 0;
+        int totalSessions = 0;
+        List<TrainerWorkloadResponse.MonthlyWorkload> monthlyBreakdown = new ArrayList<>();
+
+        LocalDate fromDate = request.getFromDate();
+        LocalDate toDate = request.getToDate();
+
+        if (fromDate == null) {
+            fromDate = LocalDate.now().withDayOfMonth(1).minusMonths(3);
+        }
+
+        if (toDate == null) {
+            toDate = LocalDate.now();
+        }
+
+        for (YearSummary yearSummary : trainer.getYearSummaries()) {
+            int year = yearSummary.getYear();
+
+            for (MonthSummary monthSummary : yearSummary.getMonthSummaries()) {
+                int month = monthSummary.getMonth();
+
+                LocalDate monthDate = LocalDate.of(year, month, 1);
+                if (!monthDate.isBefore(fromDate) && !monthDate.isAfter(toDate)) {
+                    int hours = monthSummary.getHours();
+                    int sessions = monthSummary.getSessionCount();
+
+                    totalHours += hours;
+                    totalSessions += sessions;
+
+                    TrainerWorkloadResponse.MonthlyWorkload monthlyWorkload =
+                            new TrainerWorkloadResponse.MonthlyWorkload(year, month, hours, sessions);
+                    monthlyBreakdown.add(monthlyWorkload);
+                }
+            }
+        }
+
+        response.setTotalHours(totalHours);
+        response.setTotalSessions(totalSessions);
+        response.setMonthlyBreakdown(monthlyBreakdown);
+
+        logger.info("Workload calculation completed for trainer: {}, total hours: {}",
+                trainer.getUsername(), totalHours);
+
+        return response;
     }
 
     private TrainerWorkload createNewTrainerWorkload(WorkloadRequest request) {

@@ -48,4 +48,13 @@ public class InMemoryTrainerWorkloadRepository implements TrainerWorkloadReposit
         logger.debug("Checking if trainer workload exists for username: {}, result: {}", username, exists);
         return exists;
     }
+
+    @Override
+    public Optional<TrainerWorkload> findById(Long trainerId) {
+        logger.debug("Finding trainer workload for ID: {}", trainerId);
+        String usernamePattern = "trainer" + trainerId;
+        return storage.values().stream()
+                .filter(trainer -> trainer.getTrainerUsername().equals(usernamePattern))
+                .findFirst();
+    }
 }

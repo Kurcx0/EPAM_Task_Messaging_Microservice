@@ -10,4 +10,6 @@ public interface TrainerWorkloadRepository {
     List<TrainerWorkload> findAll();
     void deleteByUsername(String username);
     boolean existsByUsername(String username);
+
+    Optional<TrainerWorkload> findById(Long trainerId);
 }
